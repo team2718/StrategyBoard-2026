@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html> 
+  <head>
+    <title>e'Possums AutoPlanner</title> 
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta charset="utf-8">
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+	<style>
+		#mycanvas {
+			display: block;
+			margin: auto;
+			height: 90vh;
+			width: calc(90vh * 2.19375);
+			margin-top: 5vh;
+			touch-action: none;
+			border: 4px solid #000;
+		}
+	</style>
+  </head>
+  <body>
+	<!--This draws the canvas on the webpage -->
+    <canvas id="mycanvas"></canvas> 
+  </body>
+ 
+  <!-- Include the processing.js library -->
+  <!-- See https://khanacademy.zendesk.com/hc/en-us/articles/202260404-What-parts-of-ProcessingJS-does-Khan-Academy-support- for differences -->
+  <script src="https://cdn.jsdelivr.net/processing.js/1.4.8/processing.min.js"></script> 
+  <script>
+  var programCode = function(processingInstance) {
+    with (processingInstance) {
+      size(1402, 640); 
+      frameRate(120);
+        
+      // BEGIN CODE
+	  
+		// CONSTANTS AND UTILITY FUNCTIONS
+		var DOUBLE_TAP_TOLERANCE = 40;
+		var RED = 1;
+		var BLUE = 2;
+		var RED_COL = color(200, 0, 0);
+		var BLUE_COL = color(0, 0, 200);
+		var TAPE_COL = 245;
+		var METAL_COL = 230;
+		var IMPRINT_COL = color(150, 200);
+		var TOP = 1;
+		var BOTTOM = 2;
+		var DRIVER_STATION_X = -width / 2 + 24;
+		var DRIVER_STATION_YS = [-height / 2 + 2 + 69, -height / 2 + 6 + 207, -height / 2 + 14 + 439];
+		var DEPOT_X = DRIVER_STATION_X + 48;
+		var DEPOT_Y = -height / 2 + 2 + 164.64 - 6.56;
+		var OBSTACLE_X = -287;
+		var TRENCH_Y = -height / 2 + 2 + 123.72 / 2;
+		var BUMP_Y = TRENCH_Y + 99.72 / 2 + 24 / 2 + 146 / 2;
+		var TOWER_X = -width / 2 + 48 + 42;
+		var TOWER_Y = -height / 2 + 276 + 10 + 47;
+		
+		rectMode(CENTER); // Rects are universally assumed to be centered
+		
+		var updateMouse = function(){
+			mousex = mouseX - width / 2;
+			mousey = mouseY - height / 2;
+		};
+		// Converts degrees to radians, and negates it for the rotate() transform
+		var degreesToRotation = function(angle) {
+			return -1 * angle * PI / 180;
+		};
+		// Takes a color, and returns it multiplied by some brightness amount
+		var bright = function(col, amt) {
+			return lerpColor(color(0, 0, 0), col, amt);
+		};
+	  
+	  
+		// FIELD DRAWING FUNCTIONS
+		var drawTape = function() {
+			strokeWeight(4);
+			stroke(TAPE_COL);
+			line(0, -height / 2 + 2, 0, height / 2 - 2);
+			line(-width / 2 + 2 + 48, 0, width / 2 - 2 - 48, 0);
+			line(338, -height / 2 + 2, 338, height / 2 - 2);
+			line(-338, -height / 2 + 2, -338, height / 2 - 2);
+		};
+		
+		var drawFuelGroup = function(x, y, xNum, yNum) {
+			pushMatrix();
+				fill(200, 200, 0);
+				stroke(0);
+				strokeWeight(0.2);
+				translate(x, y);
+				var fuelDiameter = 11.812;
+				for (var row = -yNum / 2; row < yNum / 2; row++) {
+					for (var column = -xNum / 2; column < xNum / 2; column++) {
+						ellipse(fuelDiameter * (0.5 + column), fuelDiameter * (0.5 + row), fuelDiameter, fuelDiameter);
+					}
+				}
+			popMatrix();
+		}
+		
+		var drawDriverStation = function(x, y, col) {
+			var w = 48;
+			var h = 138;
+			stroke(TAPE_COL);
+			strokeWeight(2);
+			noFill();
+			rect(x, y, w, h);
+			noStroke();
+			fill(190);
+			if (col == RED) {
+				rect(x + w / 4, y, w / 2, h);
+				strokeWeight(2);
+				stroke(RED_COL);
+				line(x + w / 2, y - h / 2, x + w / 2, y + h / 2);
+			} else if (col == BLUE) {
+				rect(x - w / 4, y, w / 2, h);
+				strokeWeight(2);
+				stroke(BLUE_COL);
+				line(x - w / 2, y - h / 2, x - w / 2, y + h / 2);
+			} else {
+				console.log("Error: Invalid driver station color");
+			}
+		};
+		
+		var drawTower = function(x, y, col) {
+			var w = 80;
+			var h = 64.5;
+			var rungH = 94;
+			var rungThickness = 3.32;
+			var supportH = 8.5;
+			var supportW = 30;
+			var postW = 7.02;
+			var postH = 3;
+			var currentCol;
+			pushMatrix();
+			translate(x, y);
+				if (col == RED) {
+					currentCol = RED_COL;
+				} else if (col == BLUE) {
+					currentCol = BLUE_COL;
+					rotate(degreesToRotation(180));
+				} else {
+					console.log("Error: Invalid tower color");
+					return;
+				}
+				// Base
+				stroke(bright(METAL_COL, 0.2));
+				strokeWeight(2);
+				line(-w / 2 - 2, -rungH / 2, -w / 2 - 2, rungH / 2);
+				fill(bright(METAL_COL, 0.2));
+				stroke(METAL_COL);
+				strokeWeight(3);
+				rect(0, 0, w, h);
+				line(-w / 2, -supportH, -w / 2 + supportW, -h / 2);
+				line(-w / 2, supportH, -w / 2 + supportW, h / 2);
+				// Rung
+				stroke(currentCol);
+				strokeWeight(rungThickness);
+				line(w / 2, -rungH / 2, w / 2, rungH / 2);
+				// Posts
+				noStroke();
+				fill(bright(currentCol, 0.9));
+				rect(w / 2, -h / 2, postW, postH);
+				rect(w / 2, h / 2, postW, postH);
+			popMatrix();
+		};
+		
+		var drawDepot = function(x, y, col) {
+			var thickness = 6;
+			var w = 48;
+			var h = 84;
+			// Thickness of bars is 3 inch
+			// 24 long horizontals
+			// beside that, 42" long vertical
+			noStroke();
+			if (col == RED) {
+				fill(RED_COL);
+				rect(x + w / 2 + thickness / 2, y, thickness, h);
+			} else if (col == BLUE) {
+				fill(BLUE_COL);
+				rect(x - w / 2 - thickness / 2, y, thickness, h);
+			} else {
+				console.log("Error: Invalid depot color");
+				return;
+			}
+			rect(x, y + h / 2 - thickness / 2, w, thickness);
+			rect(x, y + -h / 2 + thickness / 2, w, thickness);
+		};
+		
+		var drawTrench = function(x, y, col, side) {
+			var w = 94;
+			var h = 24;
+			var barH = 99.72;
+			var barW = 8;
+			var currentCol;
+			if (col === RED) {
+				currentCol = RED_COL;
+			} else if (col === BLUE) {
+				currentCol = BLUE_COL;
+			} else {
+				console.log("Error: Invalid trench color");
+				return;
+			}
+			pushMatrix();
+			translate(x, y);
+				if (side === BOTTOM) {
+					rotate(degreesToRotation(180));
+				}
+				stroke(0);
+				strokeWeight(1);
+				// Base
+				fill(bright(currentCol, 0.85));
+				rect(0, barH / 2, w, h);
+				// Bar
+				fill(bright(currentCol, 0.85));
+				rect(0, -h / 2, barW, barH);
+			popMatrix();
+		};
+		
+		var drawBump = function(x, y, col) {
+			var w = 88.8;
+			var h = 146;
+			fill(bright((col === RED ? RED_COL : BLUE_COL), 0.6));
+			stroke(0);
+			strokeWeight(2);
+			rect(x + w / 4, y, w / 2, h);
+			rect(x - w / 4, y, w / 2, h);
+		};
+		
+		var drawHub = function(x, y, col) {
+			var w = 94;
+			var h = 94;
+			var netW = w / 2 + 20.52; 
+			var netH = 116.82;
+			var openingH = 84;	
+			var currentCol;
+			pushMatrix();
+				translate(x, y);
+				if (col === RED) {
+					currentCol = RED_COL;
+				} else {
+					rotate(degreesToRotation(180));
+					currentCol = BLUE_COL;
+				}
+				
+				// Base
+				stroke(bright(METAL_COL, 0.1));
+				strokeWeight(2);
+				fill(bright(METAL_COL, 0.9));
+				quad(-w / 2, -h / 2, w / 2, -h / 2, w / 2 - 0.1 * w, -h / 2 + 0.1 * h, -w / 2 + 0.1 * w, -h / 2 + 0.1 * h);
+				quad(-w / 2, h / 2, w / 2, h / 2, w / 2 - 0.1 * w, h / 2 - 0.1 * h, -w / 2 + 0.1 * w, h / 2 - 0.1 * h);
+				quad(-w / 2, -h / 2, -w / 2, h / 2, -w / 2 + 0.1 * w, h / 2 - 0.1 * h, -w / 2 + 0.1 * w, -h / 2 + 0.1 * h);
+				quad(w / 2, -h / 2, w / 2, h / 2, w / 2 - 0.1 * w, h / 2 - 0.1 * h, w / 2 - 0.1 * w, -h / 2 + 0.1 * h);
+				
+				// Net
+				stroke(bright(METAL_COL, 0.5));
+				strokeWeight(5);
+				fill(0, 50);
+				beginShape();
+					vertex(0, -h / 2);
+					vertex(0, -netH / 2);
+					vertex(netW, -netH / 2);
+					vertex(netW, netH / 2);
+					vertex(0, netH / 2);
+					vertex(0, h / 2);
+				endShape();
+				
+				// Basket
+				stroke(bright(METAL_COL, 0.1));
+				strokeWeight(2);
+				fill(currentCol);
+				rect(0, 0, 0.8 * w, 0.8 * h);
+				fill(200, 200);
+				beginShape();
+					vertex(-w / 2, 0);
+					vertex(-w / 4, -openingH / 2);
+					vertex(w / 4, -openingH / 2);
+					vertex(w / 2, 0);
+					vertex(w / 4, openingH / 2);
+					vertex(-w / 4, openingH / 2);
+					vertex(-w / 2, 0);
+				endShape();
+				pushMatrix();
+				scale(0.65);
+					fill(bright(currentCol, 0.4));
+					beginShape();
+						vertex(-w / 2, 0);
+						vertex(-w / 4, -openingH / 2);
+						vertex(w / 4, -openingH / 2);
+						vertex(w / 2, 0);
+						vertex(w / 4, openingH / 2);
+						vertex(-w / 4, openingH / 2);
+						vertex(-w / 2, 0);
+					endShape();
+				popMatrix();
+				
+			popMatrix();
+		};
+		
+		var drawField = function() {
+			drawTape();
+			drawFuelGroup(0, 0, 12, 30); // Neutral Zone Fuel
+			
+			// Depots
+			drawDepot(DEPOT_X, DEPOT_Y, RED); // So confused... From one way it should be right, 
+																	// but from the other way it's wrong. Added 6.56 for compensation
+			drawDepot(-DEPOT_X, -DEPOT_Y, BLUE);
+			drawFuelGroup(DEPOT_X, DEPOT_Y, 4, 6);
+			drawFuelGroup(-DEPOT_X, -DEPOT_Y, 4, 6);
+
+			// Bumps
+			drawBump(OBSTACLE_X, BUMP_Y, RED);
+			drawBump(OBSTACLE_X, -BUMP_Y, RED);
+			drawBump(-OBSTACLE_X, BUMP_Y, BLUE);
+			drawBump(-OBSTACLE_X, -BUMP_Y, BLUE);
+
+			// Trenches
+			drawTrench(OBSTACLE_X, TRENCH_Y, RED, TOP);
+			drawTrench(OBSTACLE_X, -TRENCH_Y, RED, BOTTOM);
+			drawTrench(-OBSTACLE_X, TRENCH_Y, BLUE, TOP);
+			drawTrench(-OBSTACLE_X, -TRENCH_Y, BLUE, BOTTOM);
+			
+			// Hubs
+			drawHub(OBSTACLE_X, 0, RED);
+			drawHub(-OBSTACLE_X, 0, BLUE);
+
+			// Back walls
+			drawDriverStation(DRIVER_STATION_X, DRIVER_STATION_YS[0], RED);
+			drawDriverStation(DRIVER_STATION_X, DRIVER_STATION_YS[1], RED);
+			drawTower(TOWER_X, TOWER_Y, RED);
+			drawDriverStation(DRIVER_STATION_X, DRIVER_STATION_YS[2], RED);
+			
+			drawDriverStation(-DRIVER_STATION_X, -DRIVER_STATION_YS[0], BLUE);
+			drawDriverStation(-DRIVER_STATION_X, -DRIVER_STATION_YS[1], BLUE);
+			drawTower(-TOWER_X, -TOWER_Y, BLUE);
+			drawDriverStation(-DRIVER_STATION_X, -DRIVER_STATION_YS[2], BLUE);
+		};
+
+
+		// ROBOT AND PATH FUNCTIONS
+		var Robot = function(config){
+			this.x = config.x || 0;
+			this.y = config.y || 0;
+			this.color = config.color || RED;
+			this.angle = config.angle || 0;
+			this.pastNodes = config.pastNodes || [];
+			this.imprints = config.imprints || [];
+			this.dragging = config.dragging || false;
+			this.rotating = config.rotating || false;
+			this.firstMove = config.firstMove || true;
+			this.teamNum = config.teamNum || 2718;
+			this.lastTap = config.lastTap || -DOUBLE_TAP_TOLERANCE;
+		};
+		Robot.prototype.drawFrame = function(x, y, angle, col) {
+			noFill();
+			stroke(col);
+			strokeWeight(4.5);
+			pushMatrix();
+				translate(x, y);
+				rotate(degreesToRotation(angle));
+				rect(0, 0, 55, 55, 10);
+				ellipse(0, 0, 10, 10);
+				ellipse(27.5, 0, 10, 10);
+			popMatrix();
+			textAlign(CENTER, CENTER);
+			textSize(15);
+			fill(col);
+			text(this.teamNum, x, y - 50);
+		};
+		Robot.prototype.render = function() {
+			// Draw path
+			noFill();
+			if (this.pastNodes.length) {
+				stroke(this.color === RED ? color(255, 0, 0, 100) : color(0, 0, 255, 100));
+				strokeWeight(5);
+				ellipse(this.pastNodes[0], this.pastNodes[1], 20, 20);
+				for (var i = 0; i + 3 < this.pastNodes.length; i += 2){
+					line(this.pastNodes[i], this.pastNodes[i + 1], this.pastNodes[i + 2], this.pastNodes[i + 3]);
+				}
+				ellipse(this.x, this.y, 20, 20);
+			}
+			// Draw Imprints
+			if (this.imprints.length) {
+				for (var i = 0; i < this.imprints.length; i += 3) {
+					this.drawFrame(this.imprints[i], this.imprints[i + 1], this.imprints[i + 2], IMPRINT_COL);
+				}
+			}
+			// Draw Bot
+			this.drawFrame(this.x, this.y, this.angle, this.color === RED ? color(255, 0, 0) : color(0, 0, 255));
+		};
+		Robot.prototype.detectClick = function(){
+			if (dist(this.x, this.y, mousex, mousey) <= 25) {
+				return "drag";
+			} else if (dist(this.x + 27.5 * Math.cos(degreesToRotation(this.angle)), 
+			this.y + 27.5 * Math.sin(degreesToRotation(this.angle)), mousex, mousey) <= 25) {
+				return "rotate";
+			}
+			return false;
+		};
+
+		var robots = [];
+		robots.push(new Robot({x: DRIVER_STATION_X, y: DRIVER_STATION_YS[0], color: RED}));
+		robots.push(new Robot({x: DRIVER_STATION_X, y: DRIVER_STATION_YS[1], color: RED}));
+		robots.push(new Robot({x: DRIVER_STATION_X, y: DRIVER_STATION_YS[2], color: RED}));
+		
+		robots.push(new Robot({x: -DRIVER_STATION_X, y: -DRIVER_STATION_YS[0], color: BLUE, angle: 180}));
+		robots.push(new Robot({x: -DRIVER_STATION_X, y: -DRIVER_STATION_YS[1], color: BLUE, angle: 180}));
+		robots.push(new Robot({x: -DRIVER_STATION_X, y: -DRIVER_STATION_YS[2], color: BLUE, angle: 180}));
+
+
+		// INPUT PAD
+		var InputNumber = function(config){
+			this.x = config.x;
+			this.y = config.y;
+			this.w = config.w;
+			this.h = config.h;
+			this.number = config.number;
+		};
+		InputNumber.prototype.detectClick = function(x, y){
+			return (x >= this.x - this.w / 2 && x <= this.x + this.w / 2 && 
+			y >= this.y - this.h / 2 && y <= this.y + this.h / 2);
+		};
+		InputNumber.prototype.render = function(){
+			stroke(20);
+			strokeWeight(2);
+			if (this.detectClick(mousex, mousey)) {
+				fill(100);
+			} else {
+				fill(200);
+			}
+			rect(this.x, this.y, this.w, this.h, 5);
+			fill(0);
+			textAlign(CENTER, CENTER);
+			textSize(30);
+			text(this.number, this.x, this.y);
+		};
+
+		var inputPad = {
+			show: false,
+			currentNum: "",
+			nums: [
+				new InputNumber({number: '\u2717', x: -60, y: 90, w: 50, h: 50}),
+				new InputNumber({number: '0', x: 0, y: 90, w: 50, h: 50}),
+				new InputNumber({number: '\u2713', x: 60, y: 90, w: 50, h: 50}),
+				new InputNumber({number: '1', x: -60, y: 30, w: 50, h: 50}),
+				new InputNumber({number: '2', x: 0, y: 30, w: 50, h: 50}),
+				new InputNumber({number: '3', x: 60, y: 30, w: 50, h: 50}),
+				new InputNumber({number: '4', x: -60, y: -30, w: 50, h: 50}),
+				new InputNumber({number: '5', x: 0, y: -30, w: 50, h: 50}),
+				new InputNumber({number: '6', x: 60, y: -30, w: 50, h: 50}),
+				new InputNumber({number: '7', x: -60, y: -90, w: 50, h: 50}),
+				new InputNumber({number: '8', x: 0, y: -90, w: 50, h: 50}),
+				new InputNumber({number: '9', x: 60, y: -90, w: 50, h: 50})
+			],
+			render: function() {
+				if (this.show) {
+					updateMouse();
+					for (var i = 0; i < this.nums.length; i++) {
+						this.nums[i].render();
+					}
+				}
+			},
+			handleClick: function() {
+				for (var i = 0; i < this.nums.length; i++) {
+					if (this.nums[i].detectClick(mousex, mousey)) {
+						if (this.nums[i].number === '\u2717') {
+							// X button
+							this.show = false;
+							this.currentNum = "";
+						} else if (this.nums[i].number === '\u2713') {
+							// Checkmark
+							this.show = false;
+							// Approve a number
+							currentNum = "";
+						} else {
+							// Append the number to the current input
+							currentNum += this.nums[i].number;
+						}
+					}
+				}
+			}
+		};
+		
+
+		// DRAW
+		pushMatrix();
+		translate(width / 2, height / 2);
+			drawField();
+			var fieldImage = get();
+		popMatrix();
+		imageMode(CENTER);
+		
+		// inputPad.show = true;
+		draw = function() {
+			pushMatrix();
+			translate(width / 2, height / 2);
+				background(160);
+				image(fieldImage, 0, 0);
+				for (var i = 0; i < robots.length; i++){
+					robots[i].render();
+				}
+				inputPad.render();
+			popMatrix();
+		};
+
+
+		// INPUT FUNCTIONS
+		mousePressed = function() {
+			updateMouse();
+			for (var i = 0; i < robots.length; i++){
+				var check = robots[i].detectClick();
+				if (check === "drag") {
+					if (frameCount - robots[i].lastTap < DOUBLE_TAP_TOLERANCE) {
+						robots[i].imprints.push(robots[i].x, robots[i].y, robots[i].angle);
+					}
+					else {
+						robots[i].lastTap = frameCount;
+						robots[i].dragging = true;
+					}
+				} else if (check === "rotate") {
+					robots[i].rotating = true;
+				}
+			}
+			inputPad.handleClick();
+		};
+		mouseReleased = function() {
+			for (var i = 0; i < robots.length; i++){
+				if (robots[i].dragging && robots[i].firstMove) {
+					robots[i].firstMove = false;
+					robots[i].pastNodes.push(robots[i].x);
+					robots[i].pastNodes.push(robots[i].y);
+				}
+				robots[i].dragging = false;
+				robots[i].rotating = false;
+			}
+		};
+		mouseDragged = function() {
+			updateMouse();
+			for (var i = 0; i < robots.length; i++) {
+				var robor = robots[i];
+				var nodes = robor.pastNodes;
+				if (robor.dragging) {
+					if (mousex < DRIVER_STATION_X + 20 || mousex > -DRIVER_STATION_X - 20) {
+						robots[i].pastNodes = [];
+						robots[i].imprints = [];
+						robots[i].firstMove = true;
+					}
+					else {
+						if (dist(robor.x, robor.y, nodes[nodes.length - 2], nodes[nodes.length - 1]) >= 15){
+							nodes.push(robor.x);
+							nodes.push(robor.y);
+						}
+						robots[i].x = mousex;
+						robots[i].y = mousey;
+					}
+				}
+				else if (robor.rotating) {
+					robots[i].angle = atan2(robor.y - mousey, mousex - robor.x) * 180 / PI;
+				}
+				console.log(robots[i].pastNodes.length);	
+			}
+		};
+	  
+	  // END CODE
+	  
+    }};
+
+  // Get the canvas that ProcessingJS will use
+  var canvas = document.getElementById("mycanvas");
+  var processingInstance = new Processing(canvas, programCode); 
+  // The touch detection code was largely written by Gemini, and modified by me. Everything else is mine
+    var rect = canvas.getBoundingClientRect();
+	function updateMouseFromTouch(e) {
+		if (e.touches.length > 0) {
+			var touch = e.touches[0];
+			// Map the mouse values to pixels
+			processingInstance.mouseX = (touch.clientX - rect.left) * 1402 / rect.width;
+			processingInstance.mouseY = (touch.clientY - rect.top) * 640 / rect.height;
+		}
+	}
+	canvas.addEventListener("touchstart", function(e) {
+		updateMouseFromTouch(e);
+		processingInstance.mousePressed(); // Manually trigger your robot's click logic
+		e.preventDefault();
+	}, { passive: false });
+
+	canvas.addEventListener("touchmove", function(e) {
+		updateMouseFromTouch(e);
+		processingInstance.mouseDragged(); // Manually trigger your robot's drag logic
+		e.preventDefault();
+	}, { passive: false });
+
+	canvas.addEventListener("touchend", function(e) {
+		processingInstance.mouseX = null;
+		processingInstance.mouseY = null;
+		processingInstance.mouseReleased();
+		e.preventDefault();
+	}, { passive: false });
+	
+	var dragging = false;
+	function updateMouse(e) {
+		processingInstance.mouseX = (e.clientX - rect.left) * 1402 / rect.width;
+		processingInstance.mouseY = (e.clientY - rect.top) * 640 / rect.height;
+	}
+	canvas.addEventListener("mousedown", function(e) {
+		dragging = true;
+		updateMouse(e);
+		//e.preventDefault();
+	}, { passive: false });
+	canvas.addEventListener("mousemove", function(e) {
+		updateMouse(e);
+		if (dragging) {
+			processingInstance.mouseDragged();
+		}
+		//e.preventDefault();
+	}, { passive: false });
+	canvas.addEventListener("mouseup", function(e) {
+		dragging = false;
+		processingInstance.mouseX = null;
+		processingInstance.mouseY = null;
+		processingInstance.mouseReleased();
+		//e.preventDefault();
+	}, { passive: false });
+	
+  </script>
+</html>
