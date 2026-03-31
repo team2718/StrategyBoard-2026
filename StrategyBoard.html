@@ -1,7 +1,14 @@
+<!-- 
+	Team OKC Robotics
+	e'Possums StrategyBoard 2026
+	Code by Caleb Winterscheidt
+	Last modified 3/30/2026
+-->
+
 <!DOCTYPE html>
 <html> 
   <head>
-    <title>e'Possums AutoPlanner</title> 
+    <title>e'Possums Strategy Board</title> 
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta charset="utf-8">
 	<link rel="icon" href="favicon.ico" type="image/x-icon">
@@ -34,7 +41,7 @@
       // BEGIN CODE
 	  
 		// CONSTANTS AND UTILITY FUNCTIONS
-		var DOUBLE_TAP_TOLERANCE = 40;
+		var DOUBLE_TAP_TOLERANCE = 50;
 		var RED = 1;
 		var BLUE = 2;
 		var RED_COL = color(200, 0, 0);
@@ -44,15 +51,20 @@
 		var IMPRINT_COL = color(150, 200);
 		var TOP = 1;
 		var BOTTOM = 2;
+		
+		var FUEL_DIAMETER = 11.812;
+		var MYSTERIOUS_OFFSET_CONSTANT = 6.56;
 		var DRIVER_STATION_X = -width / 2 + 24;
 		var DRIVER_STATION_YS = [-height / 2 + 2 + 69, -height / 2 + 6 + 207, -height / 2 + 14 + 439];
+		var HUMAN_OUTPOST_X = DRIVER_STATION_X - 3;
+		var HUMAN_OUTPOST_Y = height / 2 - 2 - 51.24 - MYSTERIOUS_OFFSET_CONSTANT;
 		var DEPOT_X = DRIVER_STATION_X + 48;
-		var DEPOT_Y = -height / 2 + 2 + 164.64 - 6.56;
+		var DEPOT_Y = -height / 2 + 2 + 164.64 - MYSTERIOUS_OFFSET_CONSTANT;
+		var TOWER_X = -width / 2 + 48 + 42;
+		var TOWER_Y = -height / 2 + 276 + 10 + 47;
 		var OBSTACLE_X = -287;
 		var TRENCH_Y = -height / 2 + 2 + 123.72 / 2;
 		var BUMP_Y = TRENCH_Y + 99.72 / 2 + 24 / 2 + 146 / 2;
-		var TOWER_X = -width / 2 + 48 + 42;
-		var TOWER_Y = -height / 2 + 276 + 10 + 47;
 		
 		rectMode(CENTER); // Rects are universally assumed to be centered
 		
@@ -78,6 +90,8 @@
 			line(-width / 2 + 2 + 48, 0, width / 2 - 2 - 48, 0);
 			line(338, -height / 2 + 2, 338, height / 2 - 2);
 			line(-338, -height / 2 + 2, -338, height / 2 - 2);
+			line(DRIVER_STATION_X + 24, HUMAN_OUTPOST_Y - 49.32, DRIVER_STATION_X - 24, HUMAN_OUTPOST_Y - 49.32);
+			line(-DRIVER_STATION_X - 24, -HUMAN_OUTPOST_Y + 49.32, -DRIVER_STATION_X + 24, -HUMAN_OUTPOST_Y + 49.32);
 		};
 		
 		var drawFuelGroup = function(x, y, xNum, yNum) {
@@ -86,10 +100,9 @@
 				stroke(0);
 				strokeWeight(0.2);
 				translate(x, y);
-				var fuelDiameter = 11.812;
 				for (var row = -yNum / 2; row < yNum / 2; row++) {
 					for (var column = -xNum / 2; column < xNum / 2; column++) {
-						ellipse(fuelDiameter * (0.5 + column), fuelDiameter * (0.5 + row), fuelDiameter, fuelDiameter);
+						ellipse(FUEL_DIAMETER * (0.5 + column), FUEL_DIAMETER * (0.5 + row), FUEL_DIAMETER, FUEL_DIAMETER);
 					}
 				}
 			popMatrix();
@@ -109,13 +122,34 @@
 				strokeWeight(2);
 				stroke(RED_COL);
 				line(x + w / 2, y - h / 2, x + w / 2, y + h / 2);
-			} else if (col == BLUE) {
+			} else {
 				rect(x - w / 4, y, w / 2, h);
 				strokeWeight(2);
 				stroke(BLUE_COL);
 				line(x - w / 2, y - h / 2, x - w / 2, y + h / 2);
+			}
+		};
+		
+		var drawHumanOutpost = function(x, y, col) {
+			var w = 54;
+			var h = 98.64 + MYSTERIOUS_OFFSET_CONSTANT * 2;
+			var trackH = 6 * FUEL_DIAMETER + 8;
+			
+			// Base
+			strokeWeight(4);
+			stroke(bright(METAL_COL, 0.6));
+			fill(bright(METAL_COL, 0.9));
+			rect(x, y, w, trackH);
+			drawFuelGroup(x, y, 4, 6);
+			
+			// Front wall
+			strokeWeight(2);
+			if (col === RED) {
+				stroke(RED_COL);
+				line(x + w / 2, y - h / 2, x + w / 2, y + h / 2); 
 			} else {
-				console.log("Error: Invalid driver station color");
+				stroke(BLUE_COL);
+				line(x - w / 2, y - h / 2, x - w / 2, y + h / 2);
 			}
 		};
 		
@@ -133,12 +167,9 @@
 			translate(x, y);
 				if (col == RED) {
 					currentCol = RED_COL;
-				} else if (col == BLUE) {
+				} else {
 					currentCol = BLUE_COL;
 					rotate(degreesToRotation(180));
-				} else {
-					console.log("Error: Invalid tower color");
-					return;
 				}
 				// Base
 				stroke(bright(METAL_COL, 0.2));
@@ -166,19 +197,13 @@
 			var thickness = 6;
 			var w = 48;
 			var h = 84;
-			// Thickness of bars is 3 inch
-			// 24 long horizontals
-			// beside that, 42" long vertical
 			noStroke();
 			if (col == RED) {
 				fill(RED_COL);
 				rect(x + w / 2 + thickness / 2, y, thickness, h);
-			} else if (col == BLUE) {
+			} else {
 				fill(BLUE_COL);
 				rect(x - w / 2 - thickness / 2, y, thickness, h);
-			} else {
-				console.log("Error: Invalid depot color");
-				return;
 			}
 			rect(x, y + h / 2 - thickness / 2, w, thickness);
 			rect(x, y + -h / 2 + thickness / 2, w, thickness);
@@ -192,11 +217,8 @@
 			var currentCol;
 			if (col === RED) {
 				currentCol = RED_COL;
-			} else if (col === BLUE) {
-				currentCol = BLUE_COL;
 			} else {
-				console.log("Error: Invalid trench color");
-				return;
+				currentCol = BLUE_COL;
 			}
 			pushMatrix();
 			translate(x, y);
@@ -299,8 +321,7 @@
 			drawFuelGroup(0, 0, 12, 30); // Neutral Zone Fuel
 			
 			// Depots
-			drawDepot(DEPOT_X, DEPOT_Y, RED); // So confused... From one way it should be right, 
-																	// but from the other way it's wrong. Added 6.56 for compensation
+			drawDepot(DEPOT_X, DEPOT_Y, RED);
 			drawDepot(-DEPOT_X, -DEPOT_Y, BLUE);
 			drawFuelGroup(DEPOT_X, DEPOT_Y, 4, 6);
 			drawFuelGroup(-DEPOT_X, -DEPOT_Y, 4, 6);
@@ -326,11 +347,19 @@
 			drawDriverStation(DRIVER_STATION_X, DRIVER_STATION_YS[1], RED);
 			drawTower(TOWER_X, TOWER_Y, RED);
 			drawDriverStation(DRIVER_STATION_X, DRIVER_STATION_YS[2], RED);
+			drawHumanOutpost(HUMAN_OUTPOST_X, HUMAN_OUTPOST_Y, RED);
 			
 			drawDriverStation(-DRIVER_STATION_X, -DRIVER_STATION_YS[0], BLUE);
 			drawDriverStation(-DRIVER_STATION_X, -DRIVER_STATION_YS[1], BLUE);
 			drawTower(-TOWER_X, -TOWER_Y, BLUE);
 			drawDriverStation(-DRIVER_STATION_X, -DRIVER_STATION_YS[2], BLUE);
+			drawHumanOutpost(-HUMAN_OUTPOST_X, -HUMAN_OUTPOST_Y, BLUE);
+			
+			// Border Wall
+			stroke(bright(METAL_COL, 0.3));
+			strokeWeight(4);
+			noFill();
+			rect(0, 0, width + 4, height);
 		};
 
 
@@ -345,7 +374,7 @@
 			this.dragging = config.dragging || false;
 			this.rotating = config.rotating || false;
 			this.firstMove = config.firstMove || true;
-			this.teamNum = config.teamNum || 2718;
+			this.teamNum = config.teamNum || null;
 			this.lastTap = config.lastTap || -DOUBLE_TAP_TOLERANCE;
 		};
 		Robot.prototype.drawFrame = function(x, y, angle, col) {
@@ -403,6 +432,15 @@
 		robots.push(new Robot({x: -DRIVER_STATION_X, y: -DRIVER_STATION_YS[0], color: BLUE, angle: 180}));
 		robots.push(new Robot({x: -DRIVER_STATION_X, y: -DRIVER_STATION_YS[1], color: BLUE, angle: 180}));
 		robots.push(new Robot({x: -DRIVER_STATION_X, y: -DRIVER_STATION_YS[2], color: BLUE, angle: 180}));
+		
+		// Reorders the robot array based on most recent activity
+		var shiftRobots = function(index) {
+			var temp = robots[index];
+			for (var i = index; i < robots.length - 1; i++) {
+				robots[i] = robots[i + 1];
+			}
+			robots[robots.length - 1] = temp;
+		};
 
 
 		// INPUT PAD
@@ -435,6 +473,7 @@
 		var inputPad = {
 			show: false,
 			currentNum: "",
+			target: null,
 			nums: [
 				new InputNumber({number: '\u2717', x: -60, y: 90, w: 50, h: 50}),
 				new InputNumber({number: '0', x: 0, y: 90, w: 50, h: 50}),
@@ -451,6 +490,10 @@
 			],
 			render: function() {
 				if (this.show) {
+				stroke(20);
+				fill(150);
+				strokeWeight(2);
+				rect(0, 0, 190, 250, 5);
 					updateMouse();
 					for (var i = 0; i < this.nums.length; i++) {
 						this.nums[i].render();
@@ -467,11 +510,16 @@
 						} else if (this.nums[i].number === '\u2713') {
 							// Checkmark
 							this.show = false;
-							// Approve a number
-							currentNum = "";
+							this.target.teamNum = this.currentNum;
+							this.currentNum = "";
 						} else {
 							// Append the number to the current input
-							currentNum += this.nums[i].number;
+							this.currentNum += this.nums[i].number;
+							if (this.currentNum.length === 5) {
+								this.show = false;
+								this.target.teamNum = this.currentNum;
+								this.currentNum = "";
+							}
 						}
 					}
 				}
@@ -487,7 +535,6 @@
 		popMatrix();
 		imageMode(CENTER);
 		
-		// inputPad.show = true;
 		draw = function() {
 			pushMatrix();
 			translate(width / 2, height / 2);
@@ -504,24 +551,33 @@
 		// INPUT FUNCTIONS
 		mousePressed = function() {
 			updateMouse();
-			for (var i = 0; i < robots.length; i++){
+			for (var i = robots.length - 1; i >= 0; i--){
 				var check = robots[i].detectClick();
 				if (check === "drag") {
 					if (frameCount - robots[i].lastTap < DOUBLE_TAP_TOLERANCE) {
-						robots[i].imprints.push(robots[i].x, robots[i].y, robots[i].angle);
+						if (mousex < DRIVER_STATION_X + 20 || mousex > -DRIVER_STATION_X - 20) {
+							inputPad.show = true;
+							inputPad.target = robots[i];
+						} else {
+							robots[i].imprints.push(robots[i].x, robots[i].y, robots[i].angle);
+						}
 					}
 					else {
 						robots[i].lastTap = frameCount;
 						robots[i].dragging = true;
+						shiftRobots(i);
+						break;
 					}
 				} else if (check === "rotate") {
 					robots[i].rotating = true;
+					shiftRobots(i);
+					break;
 				}
 			}
 			inputPad.handleClick();
 		};
 		mouseReleased = function() {
-			for (var i = 0; i < robots.length; i++){
+			for (var i = robots.length - 1; i >= 0; i--){
 				if (robots[i].dragging && robots[i].firstMove) {
 					robots[i].firstMove = false;
 					robots[i].pastNodes.push(robots[i].x);
@@ -533,7 +589,7 @@
 		};
 		mouseDragged = function() {
 			updateMouse();
-			for (var i = 0; i < robots.length; i++) {
+			for (var i = robots.length - 1; i >= 0; i--) {
 				var robor = robots[i];
 				var nodes = robor.pastNodes;
 				if (robor.dragging) {
@@ -547,14 +603,13 @@
 							nodes.push(robor.x);
 							nodes.push(robor.y);
 						}
-						robots[i].x = mousex;
-						robots[i].y = mousey;
 					}
+					robots[i].x = mousex;
+					robots[i].y = mousey;
 				}
 				else if (robor.rotating) {
 					robots[i].angle = atan2(robor.y - mousey, mousex - robor.x) * 180 / PI;
 				}
-				console.log(robots[i].pastNodes.length);	
 			}
 		};
 	  
